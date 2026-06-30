@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DISPATCH — Scrape &amp; Synthesize</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2EEE3;
+    --paper-deep:#E9E2D0;
+    --ink:#22201B;
+    --ink-soft:#5B564C;
+    --rule:#D9D0BA;
+    --copper:#C0683A;
+    --copper-deep:#9C4E29;
+    --teal:#2A5A50;
+    --teal-deep:#1D413A;
+    --paper-card:#FBF9F3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  ::selection{background:var(--copper);color:var(--paper);}
+
+  /* Masthead */
+  .masthead{
+    border-bottom:3px solid var(--ink);
+    padding:22px 32px 16px;
+    display:flex;justify-content:space-between;align-items:flex-end;
+    flex-wrap:wrap; gap:10px;
+  }
+  .masthead .left{display:flex;flex-direction:column;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--copper-deep); margin-bottom:6px;
+  }
+  .masthead h1{
+    font-family:'Newsreader',serif; font-weight:600; font-style:italic;
+    font-size:44px; margin:0; letter-spacing:-.01em;
+  }
+  .masthead .tag{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);
+    margin-top:6px;
+  }
+  .dateline{
+    font-family:'JetBrains Mono',monospace; font-size:12px; text-align:right; color:var(--ink-soft);
+    line-height:1.6;
+  }
+  .dateline b{color:var(--ink);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 32px 80px;}
+
+  /* Control strip */
+  .control-strip{
+    display:grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap:0;
+    border:1.5px solid var(--ink); background:var(--paper-card);
+    margin-bottom:28px;
+  }
+  .control-cell{
+    padding:16px 20px; border-right:1.5px solid var(--ink);
+  }
+  .control-cell:last-child{border-right:none;}
+  .control-cell label{
+    display:block; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:8px;
+  }
+  .control-cell input[type=number]{
+    width:100%; border:none; background:transparent; font-family:'JetBrains Mono',monospace;
+    font-size:22px; color:var(--ink); outline:none;
+  }
+  .stat-value{font-family:'Newsreader',serif; font-size:26px; font-style:italic;}
+  .stat-sub{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft);}
+  .run-btn{
+    background:var(--ink); color:var(--paper); border:none; cursor:pointer;
+    padding:0 30px; font-family:'JetBrains Mono',monospace; font-size:13px;
+    letter-spacing:.1em; text-transform:uppercase; font-weight:500;
+    transition:background .15s ease;
+    display:flex; align-items:center; gap:10px; white-space:nowrap;
+  }
+  .run-btn:hover{background:var(--copper-deep);}
+  .run-btn:disabled{background:var(--rule); color:var(--ink-soft); cursor:not-allowed;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--copper);display:inline-block;}
+  .dot.live{animation:pulse 1.1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+  /* Two column: feed + results */
+  .grid2{display:grid; grid-template-columns: 320px 1fr; gap:28px; align-items:start;}
+  @media (max-width:900px){ .grid2{grid-template-columns:1fr;} }
+
+  .feed-panel{
+    background:var(--teal-deep); color:#E9E2D0; border:1.5px solid var(--ink);
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    position:sticky; top:20px;
+  }
+  .feed-head{
+    padding:12px 16px; border-bottom:1px solid #3A6E62;
+    display:flex; justify-content:space-between; align-items:center;
+    letter-spacing:.1em; text-transform:uppercase; font-size:10px; color:#9FC4BA;
+  }
+  .feed-body{padding:14px 16px; height:420px; overflow-y:auto; line-height:1.7;}
+  .feed-body::-webkit-scrollbar{width:6px;}
+  .feed-body::-webkit-scrollbar-thumb{background:#3A6E62;}
+  .feed-line{margin-bottom:2px;}
+  .feed-line .ts{color:#6FA89B; margin-right:8px;}
+  .cursor{display:inline-block;width:7px;height:13px;background:var(--copper);
+    animation:pulse 1s infinite; vertical-align:middle; margin-left:2px;}
+
+  /* Filters */
+  .filter-row{
+    display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center;
+  }
+  .filter-row select, .filter-row input[type=text]{
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    border:1.5px solid var(--ink); background:var(--paper-card); color:var(--ink);
+    padding:9px 12px; outline:none;
+  }
+  .filter-row input[type=text]{flex:1; min-width:160px;}
+  .export-btns{margin-left:auto; display:flex; gap:8px;}
+  .ticket{
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; border:1.5px dashed var(--copper-deep); background:var(--paper-card);
+    color:var(--copper-deep); padding:9px 16px; cursor:pointer; text-decoration:none;
+  }
+  .ticket:hover{background:var(--copper); color:var(--paper); border-style:solid;}
+
+  /* Result cards */
+  .results-count{
+    font-family:'Newsreader',serif; font-style:italic; font-size:15px; color:var(--ink-soft);
+    margin-bottom:14px;
+  }
+  .card-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px;}
+  .card{
+    background:var(--paper-card); border:1.5px solid var(--ink); padding:16px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .card .cat{
+    align-self:flex-start; font-family:'JetBrains Mono',monospace; font-size:9.5px;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--paper);
+    background:var(--teal); padding:3px 8px;
+  }
+  .card h3{
+    font-family:'Newsreader',serif; font-size:18px; font-weight:600; margin:2px 0 0;
+    line-height:1.3;
+  }
+  .card .price-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);
+    border-top:1px dashed var(--rule); padding-top:8px; margin-top:2px;
+  }
+  .card .price-row b{color:var(--copper-deep); font-size:14px;}
+  .card p.summary{
+    font-size:13px; color:var(--ink-soft); line-height:1.5; margin:0;
+  }
+  .engine-tag{
+    font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--ink-soft); opacity:.7;
+  }
+
+  .empty-state{
+    border:1.5px dashed var(--rule); padding:60px 20px; text-align:center;
+    font-family:'Newsreader',serif; font-style:italic; color:var(--ink-soft); font-size:17px;
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="left">
+    <div class="eyebrow">Wire Service · Automated Intelligence</div>
+    <h1>The Dispatch</h1>
+    <div class="tag">scrape → clean → categorize → summarize → export</div>
+  </div>
+  <div class="dateline" id="dateline">— · —</div>
+</div>
+
+<div class="wrap">
+
+  <div class="control-strip">
+    <div class="control-cell" style="flex:1.4;">
+      <label>Target URL</label>
+      <input type="text" id="targetUrl" value="https://books.toscrape.com/"
+        style="width:100%;border:none;background:transparent;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--ink);outline:none;">
+      <div class="stat-sub">paste any listing/catalog page</div>
+    </div>
+    <div class="control-cell">
+      <label>Pages to crawl</label>
+      <input type="number" id="maxPages" value="4" min="1" max="50">
+    </div>
+    <div class="control-cell">
+      <label>Status</label>
+      <div class="stat-value" id="statusValue">Idle</div>
+      <div class="stat-sub" id="statusSub">awaiting instruction</div>
+    </div>
+    <button class="run-btn" id="runBtn" onclick="startScrape()">
+      <span class="dot" id="runDot"></span> Run Crawl
+    </button>
+  </div>
+
+  <div class="grid2">
+    <div class="feed-panel">
+      <div class="feed-head"><span>Live Wire Feed</span><span id="feedCount">0 lines</span></div>
+      <div class="feed-body" id="feedBody">
+        <div class="feed-line"><span class="ts">[--:--:--]</span>Awaiting first dispatch<span class="cursor"></span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="filter-row">
+        <select id="categoryFilter" onchange="loadResults()">
+          <option value="all">All categories</option>
+        </select>
+        <input type="text" id="searchBox" placeholder="search titles…" oninput="loadResults()">
+        <div class="export-btns">
+          <a class="ticket" href="/api/export/csv">⬇ CSV</a>
+          <a class="ticket" href="/api/export/json">⬇ JSON</a>
+        </div>
+      </div>
+      <div class="results-count" id="resultsCount">No dispatches synthesized yet.</div>
+      <div id="cardGrid" class="card-grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const dl = document.getElementById('dateline');
+function tickClock(){
+  const d = new Date();
+  dl.innerHTML = `<b>${d.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric', year:'numeric'})}</b><br>${d.toLocaleTimeString()}`;
+}
+tickClock(); setInterval(tickClock, 1000);
+
+let polling = null;
+
+async function startScrape(){
+  const maxPages = parseInt(document.getElementById('maxPages').value) || 4;
+  const targetUrl = document.getElementById('targetUrl').value.trim() || 'https://books.toscrape.com/';
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  document.getElementById('runDot').classList.add('live');
+  await fetch('/api/scrape', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({max_pages: maxPages, target_url: targetUrl})
+  });
+  if(polling) clearInterval(polling);
+  polling = setInterval(pollStatus, 900);
+  pollStatus();
+}
+
+function tsNow(){
+  const d = new Date();
+  return d.toTimeString().split(' ')[0];
+}
+
+let lastLogLen = 0;
+async function pollStatus(){
+  const res = await fetch('/api/status');
+  const data = await res.json();
+
+  const statusValue = document.getElementById('statusValue');
+  const statusSub = document.getElementById('statusSub');
+
+  if(data.scrape_status === 'running'){
+    statusValue.textContent = `Crawling p.${data.current_page||0}/${data.max_pages}`;
+    statusSub.textContent = `${data.total_items||0} items captured so far`;
+  } else if (data.scrape_status === 'done' && data.ai_status === 'running'){
+    const [done,total] = data.ai_progress || [0,0];
+    statusValue.textContent = `Synthesizing ${done}/${total}`;
+    statusSub.textContent = 'AI cleaning · categorizing · summarizing';
+  } else if (data.ai_status === 'done'){
+    statusValue.textContent = 'Complete';
+    statusSub.textContent = `${data.result_count} dispatches ready`;
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runDot').classList.remove('live');
+    loadResults();
+    if(polling){ clearInterval(polling); polling=null; }
+  } else if (data.scrape_status === 'error' || data.ai_status === 'error'){
+    statusValue.textContent = 'Error';
+    statusSub.textContent = data.error || 'see feed for details';
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runDot').classList.remove('live');
+    if(polling){ clearInterval(polling); polling=null; }
+  } else {
+    statusValue.textContent = 'Idle';
+    statusSub.textContent = 'awaiting instruction';
+  }
+
+  if(data.log && data.log.length){
+    const body = document.getElementById('feedBody');
+    if(data.log.length !== lastLogLen){
+      body.innerHTML = data.log.map(line =>
+        `<div class="feed-line"><span class="ts">[${tsNow()}]</span>${escapeHtml(line)}</div>`
+      ).join('') + '<span class="cursor"></span>';
+      body.scrollTop = body.scrollHeight;
+      lastLogLen = data.log.length;
+      document.getElementById('feedCount').textContent = `${data.log.length} lines`;
+    }
+  }
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function loadResults(){
+  const cat = document.getElementById('categoryFilter').value;
+  const q = document.getElementById('searchBox').value;
+  const params = new URLSearchParams();
+  if(cat) params.set('category', cat);
+  if(q) params.set('q', q);
+  const res = await fetch('/api/results?' + params.toString());
+  const data = await res.json();
+
+  // populate category filter once
+  const sel = document.getElementById('categoryFilter');
+  const current = sel.value;
+  if(data.categories && data.categories.length){
+    sel.innerHTML = '<option value="all">All categories</option>' +
+      data.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.value = current && [...sel.options].some(o=>o.value===current) ? current : 'all';
+  }
+
+  const grid = document.getElementById('cardGrid');
+  const countEl = document.getElementById('resultsCount');
+
+  if(!data.items.length){
+    countEl.textContent = 'No dispatches synthesized yet.';
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No items to show — run a crawl to fill the wire.</div>`;
+    return;
+  }
+
+  countEl.textContent = `${data.items.length} dispatch${data.items.length===1?'':'es'} on file`;
+  grid.innerHTML = data.items.map(it => `
+    <div class="card">
+      <span class="cat">${escapeHtml(it.category || 'Uncategorized')}</span>
+      <h3>${escapeHtml(it.title)}</h3>
+      <p class="summary">${escapeHtml(it.summary || '')}</p>
+      <div class="price-row">
+        <span>${escapeHtml(it.availability || '')}</span>
+        <b>${escapeHtml(it.price || '')}</b>
+      </div>
+      <span class="engine-tag">via ${escapeHtml(it.ai_engine || 'unknown')}</span>
+    </div>
+  `).join('');
+}
+
+loadResults();
+</script>
+</body>
+</html>
